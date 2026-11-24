@@ -408,6 +408,45 @@ $('#imf').onchange=async e=>{
   }catch(err){toast('Fichier JSON invalide')}
 };
 
+/* ---------- recherche en ligne ---------- */
+async function getJson(url){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
+  try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}
+}
+function fixImg(u){return u?String(u).replace(/^http:/,'https:').replace('&edge=curl',''):''}
+async function lookupCode(code){
+  const isIsbn=/^97[89]\d{10}$/.test(code);
+  if(isIsbn){
+    try{
+      const j=await getJson('https://www.googleapis.com/books/v1/volumes?q=isbn:'+code);
+      const v=j.items&&j.items[0]&&j.items[0].volumeInfo;
+      if(v&&v.title)return{type:'bd',title:v.title+(v.subtitle?' - '+v.subtitle:''),creator:(v.authors||[]).join(', '),publisher:v.publisher||'',year:(v.publishedDate||'').slice(0,4),genre:(v.categories||[])[0]||'',cover:fixImg(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail)),src:'Google Books'};
+    }catch(e){}
+    try{
+      const j=await getJson('https://openlibrary.org/api/books?bibkeys=ISBN:'+code+'&format=json&jscmd=data');
+      const v=j['ISBN:'+code];
+      if(v&&v.title)return{type:'bd',title:v.title,creator:(v.authors||[]).map(a=>a.name).join(', '),publisher:(v.publishers||[]).map(a=>a.name).join(', '),year:((v.publish_date||'').match(/\d{4}/)||[''])[0],genre:'',cover:fixImg(v.cover&&(v.cover.medium||v.cover.small)),src:'Open Library'};
+    }catch(e){}
+    return null;
+  }
+  try{
+    const j=await getJson('https://api.upcitemdb.com/prod/trial/lookup?upc='+code);
+    const v=j.items&&j.items[0];
+    if(v&&v.title)return{type:'dvd',title:v.title,creator:'',publisher:v.brand||'',year:'',genre:'',cover:fixImg(v.images&&v.images[0]),src:'UPCitemdb'};
+  }catch(e){}
+  return null;
+}
+async function coverToData(url){
+  if(!url)return '';
+  try{const r=await fetch(url);if(!r.ok)throw 0;const b=await r.blob();return await resizeImage(b)}catch(e){return url}
+}
+function applyInfo(info){
+  const f=F();
+  if(info.type&&f.type.value!==info.type){f.type.value=info.type;applyType()}
+  ['title','creator','publisher','year','genre'].forEach(k=>{if(info[k]&&!f[k].value.trim())f[k].value=info[k]});
+  if(info.cover&&!cover)setCover(info.cover);
+}
+
 /* ---------- scanner ---------- */
 let scMode='search',scReader=null,scBusy=false;
 function normCode(c){
@@ -481,7 +520,8 @@ async function decodePhoto(file){
 function onCode(raw){
   const code=normCode(raw);
   if(scMode==='fill'){
-    F().code.value=code;scStop();$('#ds').close();toast('Code : '+code);scBusy=false;return;
+    F().code.value=code;scStop();$('#ds').close();scBusy=false;toast('Recherche en ligne…');
+    lookupCode(code).then(async info=>{if(!info){toast('Code lu. Rien trouvé en ligne : remplis à la main.');return}info.cover=await coverToData(info.cover);applyInfo(info);toast('Fiche remplie ('+info.src+'). Vérifie avant d’enregistrer.')});return;
   }
   scStatus('Code lu : '+code);
   const hits=items.filter(it=>it.code&&normCode(it.code)===code);
@@ -490,13 +530,20 @@ function onCode(raw){
     r.innerHTML='<div style="font-weight:600;color:var(--ok);margin-bottom:6px">✅ Tu l’as déjà</div>'+hits.map(it=>`<div class="card" style="flex-direction:row;margin-bottom:6px" data-open="${esc(it.id)}"><div style="padding:10px"><b>${esc(titleOf(it))}</b><div class="s sub">${esc([it.wish?'Dans les souhaits':'',it.creator,it.year,it.location].filter(Boolean).join(' · '))}</div></div></div>`).join('');
   }else{
     r.innerHTML=`<div style="font-weight:600;color:#c0392b;margin-bottom:6px">❌ Pas dans ta collection</div><div class="sub" style="margin-bottom:8px">Code ${esc(code)}</div><button class="btn pri" id="scAdd">+ Ajouter</button> <button class="btn" id="scWish">♡ Souhait</button>`;
-    $('#scAdd').onclick=()=>addFromScan(code,false);
-    $('#scWish').onclick=()=>addFromScan(code,true);
+    let found=null;
+    const box=document.createElement('div');box.className='sub';box.style.margin='8px 0';box.textContent='Recherche en ligne…';r.appendChild(box);
+    lookupCode(code).then(info=>{
+      found=info;
+      box.innerHTML=info?('🔎 Trouvé ('+esc(info.src)+') : <b>'+esc(info.title)+'</b>'+(info.creator?' — '+esc(info.creator):'')+(info.year?' ('+esc(info.year)+')':'')+'<br>Vérifie, puis ajoute.'):'Rien trouvé en ligne (ou pas de réseau) : tu remplis à la main.';
+    }).catch(()=>{box.textContent='Recherche impossible : tu remplis à la main.'});
+    $('#scAdd').onclick=()=>addFromScan(code,false,found);
+    $('#scWish').onclick=()=>addFromScan(code,true,found);
   }
   setTimeout(()=>{scBusy=false},2500);
 }
-function addFromScan(code,wish){
+async function addFromScan(code,wish,info){
   scStop();$('#ds').close();openForm(null,wish);F().code.value=code;
+  if(info){applyInfo(info);if(info.cover&&info.cover.startsWith('http')){const d=await coverToData(info.cover);if(d&&cover===info.cover)setCover(d)}}
 }
 $('#bScan').onclick=()=>openScan('search');
 $('#bScanF').onclick=()=>openScan('fill');
