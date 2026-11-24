@@ -2,6 +2,10 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b4442b">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ma collection BD & DVD</title>
 <style>
@@ -417,6 +421,7 @@ function normCode(c){
 }
 function scStatus(t){$('#scSt').textContent=t}
 function scStop(){
+  if(typeof scLoop!=='undefined'&&scLoop){clearInterval(scLoop);scLoop=null}
   try{if(scReader)scReader.reset()}catch(e){}
   scReader=null;
   const v=$('#vid');if(v&&v.srcObject){v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null}
@@ -434,25 +439,42 @@ function openScan(mode){
   scStatus('Démarrage de la caméra…');
   startLive();
 }
+let scLoop=null,scStream=null;
 async function startLive(){
   scStop();
+  const v=$('#vid');
   try{
-    scReader=mkReader();
-    if(!scReader||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw 0;
-    await scReader.decodeFromConstraints({video:{facingMode:{ideal:'environment'}}},'vid',(res)=>{
-      if(res&&!scBusy){scBusy=true;onCode(res.getText())}
-    });
-    scStatus('Vise le code-barres au dos de la BD ou du boîtier.');
-  }catch(e){
-    scStatus('Caméra live indisponible : prends une photo ou tape le code.');
-  }
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw 0;
+    scStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},focusMode:{ideal:'continuous'}},audio:false});
+    v.srcObject=scStream;await v.play();
+    try{const tr=scStream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities();
+      if(cap&&cap.focusMode&&cap.focusMode.includes('continuous'))await tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+    let det=null;
+    if('BarcodeDetector' in window){try{det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']})}catch(e){}}
+    const Z=window.ZXing;let zr=null;
+    if(!det&&Z){zr=mkReader()}
+    const cv=document.createElement('canvas');
+    scStatus('Vise le code-barres (bien éclairé, à 15-20 cm).');
+    scLoop=setInterval(async()=>{
+      if(scBusy||v.readyState<2||!v.videoWidth)return;
+      try{
+        let txt=null;
+        if(det){const r=await det.detect(v);if(r.length)txt=r[0].rawValue}
+        else if(zr){cv.width=v.videoWidth;cv.height=v.videoHeight;cv.getContext('2d').drawImage(v,0,0);
+          try{txt=zr.decodeFromCanvas?zr.decodeFromCanvas(cv).getText():null}catch(e){}}
+        if(txt){scBusy=true;onCode(txt)}
+      }catch(e){}
+    },180);
+  }catch(e){scStatus('Caméra live indisponible : prends une photo ou tape le code.')}
 }
 async function decodePhoto(file){
   scStatus('Analyse de la photo…');
   const url=URL.createObjectURL(file);
   try{
-    const r=mkReader();const res=await r.decodeFromImageUrl(url);
-    onCode(res.getText());
+    let txt=null;
+    if('BarcodeDetector' in window){try{const bmp=await createImageBitmap(file);const r=await new BarcodeDetector().detect(bmp);if(r.length)txt=r[0].rawValue}catch(e){}}
+    if(!txt){const r=mkReader();const res=await r.decodeFromImageUrl(url);txt=res.getText()}
+    onCode(txt);
   }catch(e){scStatus('Code non lu. Rapproche-toi, évite les reflets, ou tape le code.')}
   URL.revokeObjectURL(url);
 }
@@ -471,9 +493,7 @@ function onCode(raw){
     $('#scAdd').onclick=()=>addFromScan(code,false);
     $('#scWish').onclick=()=>addFromScan(code,true);
   }
-  scBusy=false; // on peut scanner autre chose
-  try{if(scReader)scReader.reset()}catch(e){}
-  setTimeout(()=>{if($('#ds').open)startLive()},1800);
+  setTimeout(()=>{scBusy=false},2500);
 }
 function addFromScan(code,wish){
   scStop();$('#ds').close();openForm(null,wish);F().code.value=code;
@@ -488,6 +508,7 @@ $('#scGo').onclick=()=>{const v=$('#scMan').value.trim();if(v)onCode(v)};
 $('#scMan').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#scGo').click()}};
 $('#ds').addEventListener('click',e=>{const c=e.target.closest('[data-open]');if(c){const it=items.find(x=>x.id===c.dataset.open);if(it){scStop();$('#ds').close();openForm(it)}}});
 
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();initStore();
 })();
 </script>
