@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2b6cb4">
+<meta name="theme-color" content="#b4442b">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mes livres</title>
+<title>Ma collection</title>
 <style>
 :root{--bg:#f6f4ef;--card:#fff;--ink:#1d1d1f;--mut:#6b6b70;--line:#e2dfd7;--acc:#b4442b;--acc2:#2b6cb4;--ok:#2f7d4f;--warn:#b7791f}
 @media (prefers-color-scheme:dark){:root{--bg:#17171a;--card:#222226;--ink:#f0eee9;--mut:#9a9aa2;--line:#35353b;--acc:#e0765c;--acc2:#6aa3e8;--ok:#5fbf86;--warn:#e0b050}}
@@ -68,8 +68,8 @@ label input,label select,label textarea{display:block;width:100%;margin-top:3px;
 .cvrow{display:flex;gap:12px;align-items:center;margin-bottom:10px}
 .cvp{width:150px;height:200px;flex:none;border-radius:8px;background:var(--bg) center/cover;border:1px dashed var(--line);cursor:zoom-in}
 .cvp.big{width:min(260px,72vw);height:min(347px,96vw);cursor:zoom-out}
-.cvrow{align-items:flex-start!important;flex-wrap:wrap}
-.cvrow>div:last-child{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:140px}
+.cvrow{flex-direction:column;align-items:flex-start!important}
+.cvrow>div:last-child{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .chk{display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap}
 .chk label{display:flex;align-items:center;gap:6px;margin:0;font-size:14px;color:var(--ink)}
 .chk input{width:auto;margin:0}
@@ -80,7 +80,7 @@ textarea.exp{width:100%;height:240px;font:12px monospace}
 </head>
 <body>
 <header>
-  <div><h1>📖 Mes livres</h1><div class="sub" id="store">Chargement…</div></div>
+  <div><h1>📚 Ma collection</h1><div class="sub" id="store">Chargement…</div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn" id="bData">Import / Export</button>
     <button class="btn pri" id="bAdd">+ Ajouter</button>
@@ -89,7 +89,7 @@ textarea.exp{width:100%;height:240px;font:12px monospace}
 
 <div class="bar"><div class="tabs" id="tabs"></div></div>
 <div class="bar">
-  <input type="search" id="q" placeholder="🔎 Je l’ai déjà ? Titre, auteur, série…">
+  <input type="search" id="q" placeholder="🔎 Je l’ai déjà ? Tape un titre, une série…">
   <button class="btn pri" id="bScan">📷 Scanner</button>
   <select id="genre"><option value="">Tous genres</option></select>
   <select id="sort">
@@ -109,7 +109,11 @@ textarea.exp{width:100%;height:240px;font:12px monospace}
   <form id="f" autocomplete="off">
     <div class="mh"><h2 id="dt">Ajouter</h2><button type="button" class="btn" id="dx">✕</button></div>
     <div class="mb">
-      <input type="hidden" name="type" value="livre">
+      <div class="seg">
+        <label><input type="radio" name="type" value="bd" checked><span>📚 BD</span></label>
+        <label><input type="radio" name="type" value="livre"><span>📖 Livre</span></label>
+        <label><input type="radio" name="type" value="dvd"><span>💿 DVD / Film</span></label>
+      </div>
       <label>Titre *<input name="title" required maxlength="200"></label>
       <div class="row">
         <label><span class="l-series">Série</span><input name="series" list="dl-series" maxlength="120"></label>
@@ -178,8 +182,7 @@ textarea.exp{width:100%;height:240px;font:12px monospace}
     <div id="scRes" style="min-height:92px;margin-bottom:8px"><div class="sub" style="padding:8px 0">Le résultat s’affichera ici.</div></div>
     <video id="vid" playsinline muted style="width:100%;height:150px;background:#000;border-radius:8px;object-fit:cover"></video>
     <div style="display:flex;gap:6px;margin-top:6px"><button type="button" class="btn" id="scFocus">🎯 Mise au point</button><button type="button" class="btn" id="scZoom">🔍 Zoom ×1</button></div>
-    <div class="sub" id="scSt" style="margin:6px 0">Vise le code-barres au dos du livre.</div>
-    <label style="display:flex;gap:8px;align-items:center;margin:6px 0 10px;color:var(--ink);font-size:14px"><input type="checkbox" id="scRapid" style="width:auto;margin:0"> ⚡ Ajout rapide : enregistre tout seul si trouvé</label>
+    <div class="sub" id="scSt" style="margin:6px 0 10px">Vise le code-barres au dos du livre, de la BD ou du boîtier.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn" id="scPhoto">📸 Photo</button>
       <input type="file" id="scFile" accept="image/*" capture="environment" hidden>
@@ -199,14 +202,14 @@ textarea.exp{width:100%;height:240px;font:12px monospace}
 'use strict';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='livres_collection_v1';
-const FORMATS={livre:['Poche','Grand format','Relié','Numérique','Audio','Autre']};
-const TABS=[['all','Collection'],['todo','À lire'],['read','Lus'],['wish','Souhaits'],['loan','Prêtés']];
+const LS='bdvd_collection_v1';
+const FORMATS={livre:['Poche','Grand format','Relié','Numérique','Audio','Autre'],bd:['Album','Poche','Intégrale','Manga','Comics','Roman graphique','Autre'],dvd:['DVD','Blu-ray','4K UHD','Coffret','Autre']};
+const TABS=[['all','Collection'],['bd','BD'],['livre','Livres'],['dvd','DVD'],['todo','À lire / voir'],['wish','Souhaits'],['loan','Prêtés']];
 
 let items=[], tab='all', view='grid', editing=null, rating=0, cover='', backend={type:'none'};
 
 /* ---------- stockage ---------- */
-function lsRead(){try{const a=JSON.parse(localStorage.getItem(LS)||'[]');return Array.isArray(a)?a.map(x=>Object.assign(x,{type:'livre'})):[]}catch(e){return []}}
+function lsRead(){try{const a=JSON.parse(localStorage.getItem(LS)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
 function lsWrite(){try{localStorage.setItem(LS,JSON.stringify(items))}catch(e){}}
 function setStore(t){$('#store').textContent=t}
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3200)}
@@ -227,7 +230,7 @@ async function remove(id){
 }
 async function initStore(){
   items=lsRead();
-  setStore('Données enregistrées sur ce téléphone (pense à exporter une sauvegarde de temps en temps)');
+  setStore('Données enregistrées sur ce téléphone (pense à exporter une sauvegarde de temps en temps) · version 12');
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   render();
 }
@@ -244,7 +247,9 @@ function visible(){
   let a=items.filter(it=>{
     const wish=!!it.wish;
     if(tab==='all'&&wish)return false;
-    if(tab==='read'&&(wish||!it.done))return false;
+    if(tab==='bd'&&(it.type!=='bd'||wish))return false;
+    if(tab==='dvd'&&(it.type!=='dvd'||wish))return false;
+    if(tab==='livre'&&(it.type!=='livre'||wish))return false;
     if(tab==='todo'&&(wish||it.done))return false;
     if(tab==='wish'&&!wish)return false;
     if(tab==='loan'&&!it.loanedTo)return false;
@@ -267,18 +272,19 @@ function visible(){
 
 /* ---------- rendu ---------- */
 function titleOf(it){return it.title+(it.volume?(' — T.'+it.volume):'')}
+const ic=it=>it.type==='dvd'?'💿':(it.type==='livre'?'📖':'📚');
 function coverHtml(it){
   const bg=it.cover?`background-image:url('${esc(it.cover)}')`:`background:linear-gradient(145deg,hsl(${hue(it.title)} 45% 38%),hsl(${(hue(it.title)+40)%360} 50% 25%))`;
   const tags=[];
   if(it.loanedTo)tags.push('<span class="tag loan">Prêté</span>');
   if(it.wish)tags.push('<span class="tag wish">Souhait</span>');
-  if(it.done&&!it.wish)tags.push(`<span class="tag done">Lu</span>`);
-  return `<div class="cov" style="${bg}"><span class="ic">📖</span>${it.cover?'':esc(it.title)}<div class="bd">${tags.join('')}</div></div>`;
+  if(it.done&&!it.wish)tags.push(`<span class="tag done">${it.type==='dvd'?'Vu':'Lu'}</span>`);
+  return `<div class="cov" style="${bg}"><span class="ic">${ic(it)}</span>${it.cover?'':esc(it.title)}<div class="bd">${tags.join('')}</div></div>`;
 }
 function render(){
   // onglets
-  const counts={all:0,todo:0,read:0,wish:0,loan:0};
-  items.forEach(it=>{if(it.wish)counts.wish++;else{counts.all++;if(it.done)counts.read++;else counts.todo++}if(it.loanedTo)counts.loan++});
+  const counts={all:0,bd:0,livre:0,dvd:0,todo:0,wish:0,loan:0};
+  items.forEach(it=>{if(it.wish)counts.wish++;else{counts.all++;counts[it.type]++;if(!it.done)counts.todo++}if(it.loanedTo)counts.loan++});
   $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab ${tab===k?'on':''}" data-t="${k}">${l}<small>${counts[k]}</small></button>`).join('');
   // genres
   const gs=[...new Set(items.map(i=>i.genre).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
@@ -289,7 +295,7 @@ function render(){
   $('#dl-creator').innerHTML=[...new Set(items.map(i=>i.creator).filter(Boolean))].map(g=>`<option value="${esc(g)}">`).join('');
   // stats
   const owned=items.filter(i=>!i.wish);
-  $('#stats').innerHTML=`<span><b>${owned.length}</b> livres</span><span><b>${owned.filter(i=>i.done).length}</b> lus</span><span><b>${owned.filter(i=>!i.done).length}</b> à lire</span><span><b>${items.filter(i=>i.loanedTo).length}</b> prêtés</span><span><b>${items.filter(i=>i.wish).length}</b> souhaits</span>`;
+  $('#stats').innerHTML=`<span><b>${owned.filter(i=>i.type==='bd').length}</b> BD</span><span><b>${owned.filter(i=>i.type==='livre').length}</b> livres</span><span><b>${owned.filter(i=>i.type==='dvd').length}</b> DVD</span><span><b>${owned.filter(i=>!i.done).length}</b> à lire/voir</span><span><b>${items.filter(i=>i.loanedTo).length}</b> prêtés</span><span><b>${items.filter(i=>i.wish).length}</b> souhaits</span>`;
   // contenu
   const a=visible(),m=$('#main');
   $('#bView').textContent=view==='grid'?'☰ Liste':'▦ Grille';
@@ -297,22 +303,23 @@ function render(){
   if(view==='grid'){
     m.innerHTML='<div class="grid">'+a.map(it=>`<div class="card" data-id="${esc(it.id)}">${coverHtml(it)}<div class="meta"><div class="t">${esc(titleOf(it))}</div><div class="s">${esc([it.series&&it.series!==it.title?it.series:'',it.creator,it.year].filter(Boolean).join(' · '))}</div>${it.rating?`<div class="stars">${stars(it.rating)}</div>`:''}</div></div>`).join('')+'</div>';
   }else{
-    m.innerHTML='<table class="list"><thead><tr><th></th><th>Titre</th><th>Série</th><th>Auteur</th><th>Année</th><th>Format</th><th>Note</th><th>Statut</th></tr></thead><tbody>'+a.map(it=>`<tr class="r" data-id="${esc(it.id)}"><td>📖</td><td><b>${esc(it.title)}</b>${it.volume?' T.'+esc(it.volume):''}</td><td>${esc(it.series)}</td><td>${esc(it.creator)}</td><td>${esc(it.year)}</td><td>${esc(it.format)}</td><td class="stars">${it.rating?stars(it.rating):''}</td><td>${[it.wish?'Souhait':'',it.loanedTo?'Prêté à '+esc(it.loanedTo):'',it.done&&!it.wish?'Lu':''].filter(Boolean).join(', ')}</td></tr>`).join('')+'</tbody></table>';
+    m.innerHTML='<table class="list"><thead><tr><th></th><th>Titre</th><th>Série</th><th>Auteur / réal.</th><th>Année</th><th>Format</th><th>Note</th><th>Statut</th></tr></thead><tbody>'+a.map(it=>`<tr class="r" data-id="${esc(it.id)}"><td>${ic(it)}</td><td><b>${esc(it.title)}</b>${it.volume?' T.'+esc(it.volume):''}</td><td>${esc(it.series)}</td><td>${esc(it.creator)}</td><td>${esc(it.year)}</td><td>${esc(it.format)}</td><td class="stars">${it.rating?stars(it.rating):''}</td><td>${[it.wish?'Souhait':'',it.loanedTo?'Prêté à '+esc(it.loanedTo):'',it.done&&!it.wish?(it.type==='dvd'?'Vu':'Lu'):''].filter(Boolean).join(', ')}</td></tr>`).join('')+'</tbody></table>';
   }
 }
 
 /* ---------- formulaire ---------- */
 const F=()=>$('#f');
 function applyType(){
-  document.querySelector('.l-series').textContent='Série / collection';
-  document.querySelector('.l-vol').textContent='Tome n°';
-  document.querySelector('.l-creator').textContent='Auteur(s)';
-  document.querySelector('.l-pub').textContent='Éditeur';
-  document.querySelector('.l-code').textContent='ISBN / code-barres';
-  document.querySelector('.l-done').textContent='Lu';
+  const t=F().type.value,dvd=t==='dvd',bd=t==='bd';
+  document.querySelector('.l-series').textContent=dvd?'Saga / collection':'Série / collection';
+  document.querySelector('.l-vol').textContent=dvd?'Numéro':'Tome n°';
+  document.querySelector('.l-creator').textContent=dvd?'Réalisateur':(bd?'Auteur(s) (scénario / dessin)':'Auteur(s)');
+  document.querySelector('.l-pub').textContent=dvd?'Éditeur / studio':'Éditeur';
+  document.querySelector('.l-code').textContent=dvd?'Code-barres (EAN)':'ISBN / code-barres';
+  document.querySelector('.l-done').textContent=dvd?'Vu':'Lu';
   const cf=F().format.value;
-  F().format.innerHTML=FORMATS.livre.map(x=>`<option>${x}</option>`).join('');
-  if(FORMATS.livre.includes(cf))F().format.value=cf;
+  F().format.innerHTML=FORMATS[t].map(x=>`<option>${x}</option>`).join('');
+  if(FORMATS[t].includes(cf))F().format.value=cf;
 }
 function drawRate(){$('#rate').innerHTML=[1,2,3,4,5].map(n=>`<span data-n="${n}">${n<=rating?'★':'☆'}</span>`).join('')}
 function setCover(src){cover=src||'';$('#cvp').style.backgroundImage=cover?`url('${cover.replace(/'/g,"%27")}')`:''}
@@ -320,7 +327,7 @@ function openForm(it,wish){
   editing=it||null;const f=F();f.reset();
   $('#dt').textContent=it?'Modifier':'Ajouter';
   $('#bDel').style.display=it?'':'none';$('#bDel').classList.remove('arm');$('#bDel').textContent='Supprimer';
-  const d=Object.assign({},it||{wish:!!wish},{type:'livre'});
+  const d=it||{type:(['bd','livre','dvd'].includes(tab)?tab:'bd'),wish:!!wish};
   f.type.value=d.type;applyType();
   ['title','series','volume','creator','publisher','year','genre','code','location','loanedTo','loanDate','notes'].forEach(k=>f[k].value=d[k]||'');
   f.format.value=d.format||FORMATS[d.type][0];
@@ -408,8 +415,8 @@ F().onsubmit=async e=>{
 };
 $('#bData').onclick=()=>{$('#expBox').hidden=true;$('#dd').showModal()};
 $('#ddx').onclick=()=>$('#dd').close();
-$('#eJson').onclick=()=>download('mes-livres.json',JSON.stringify(items,null,1),'application/json');
-$('#eCsv').onclick=()=>download('mes-livres.csv',toCsv(),'text/csv;charset=utf-8');
+$('#eJson').onclick=()=>download('collection-bd-dvd.json',JSON.stringify(items,null,1),'application/json');
+$('#eCsv').onclick=()=>download('collection-bd-dvd.csv',toCsv(),'text/csv;charset=utf-8');
 $('#iJson').onclick=()=>$('#imf').click();
 $('#imf').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -419,7 +426,7 @@ $('#imf').onchange=async e=>{
     let n=0;
     for(const x of a){
       if(!x||!x.title)continue;
-      const it=Object.assign({type:'livre',added:Date.now()},x,{id:String(x.id||uid()),type:'livre'});
+      const it=Object.assign({type:'bd',added:Date.now()},x,{id:String(x.id||uid()),type:['dvd','livre'].includes(x.type)?x.type:'bd'});
       await save(it);n++;
     }
     toast(n+' éléments importés');$('#dd').close();
@@ -427,6 +434,7 @@ $('#imf').onchange=async e=>{
 };
 
 /* ---------- recherche en ligne ---------- */
+function fixImg(u){return u?String(u).replace(/^http:/,'https:').replace('&edge=curl',''):''}
 /* Colle ta clé Google Books entre les guillemets */
 const GB_KEY=(typeof window.GB_KEY_CFG==='string'?window.GB_KEY_CFG:'')||'';
 const gbk=()=>GB_KEY?('&key='+encodeURIComponent(GB_KEY)):'';
@@ -443,11 +451,16 @@ async function getJson(url,tag){
     throw 0;
   }finally{clearTimeout(t)}
 }
-function fixImg(u){return u?String(u).replace(/^http:/,'https:').replace('&edge=curl',''):''}
-function gbMap(v){return{type:'livre',title:v.title+(v.subtitle?' - '+v.subtitle:''),creator:(v.authors||[]).join(', '),publisher:v.publisher||'',year:(v.publishedDate||'').slice(0,4),genre:(v.categories||[])[0]||'',cover:fixImg(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail)),src:'Google Books'}}
+function gbMap(v){return{type:'bd',title:v.title+(v.subtitle?' - '+v.subtitle:''),creator:(v.authors||[]).join(', '),publisher:v.publisher||'',year:(v.publishedDate||'').slice(0,4),genre:(v.categories||[])[0]||'',cover:fixImg(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail)),src:'Google Books'}}
 async function lookupCore(code){
   LOG=[];
-  if(!/^97[89]\d{10}$/.test(code)){LOG.push('Ce code n’est pas un ISBN (il doit commencer par 978 ou 979)');return null}
+  if(!/^97[89]\d{10}$/.test(code)){
+    try{const j=await getJson('https://api.upcitemdb.com/prod/trial/lookup?upc='+code,'UPCitemdb');
+      const v=j.items&&j.items[0];
+      if(v&&v.title)return{type:'dvd',title:v.title,creator:'',publisher:v.brand||'',year:'',genre:'',cover:fixImg(v.images&&v.images[0]),src:'UPCitemdb'};
+      LOG.push('UPCitemdb : aucun résultat')}catch(e){}
+    return null;
+  }
   // 1. Google Books (isbn:)
   try{const j=await getJson('https://www.googleapis.com/books/v1/volumes?q=isbn:'+code+'&maxResults=3'+gbk(),'Google Books');
     const v=j.items&&j.items[0]&&j.items[0].volumeInfo;if(v&&v.title)return gbMap(v);LOG.push('Google Books : aucun résultat')}catch(e){}
@@ -457,11 +470,11 @@ async function lookupCore(code){
   // 3. Open Library (données)
   try{const j=await getJson('https://openlibrary.org/api/books?bibkeys=ISBN:'+code+'&format=json&jscmd=data','Open Library');
     const v=j['ISBN:'+code];
-    if(v&&v.title)return{type:'livre',title:v.title,creator:(v.authors||[]).map(a=>a.name).join(', '),publisher:(v.publishers||[]).map(a=>a.name).join(', '),year:((v.publish_date||'').match(/\d{4}/)||[''])[0],genre:'',cover:fixImg(v.cover&&(v.cover.medium||v.cover.small)),src:'Open Library'};
+    if(v&&v.title)return{type:'bd',title:v.title,creator:(v.authors||[]).map(a=>a.name).join(', '),publisher:(v.publishers||[]).map(a=>a.name).join(', '),year:((v.publish_date||'').match(/\d{4}/)||[''])[0],genre:'',cover:fixImg(v.cover&&(v.cover.medium||v.cover.small)),src:'Open Library'};
     LOG.push('Open Library : aucun résultat')}catch(e){}
   // 4. Open Library (fiche simple)
   try{const v=await getJson('https://openlibrary.org/isbn/'+code+'.json','Open Library (2)');
-    if(v&&v.title)return{type:'livre',title:v.title,creator:'',publisher:(v.publishers||[]).join(', '),year:((v.publish_date||'').match(/\d{4}/)||[''])[0],genre:'',cover:'https://covers.openlibrary.org/b/isbn/'+code+'-M.jpg',src:'Open Library'}}catch(e){}
+    if(v&&v.title)return{type:'bd',title:v.title,creator:'',publisher:(v.publishers||[]).join(', '),year:((v.publish_date||'').match(/\d{4}/)||[''])[0],genre:'',cover:'https://covers.openlibrary.org/b/isbn/'+code+'-M.jpg',src:'Open Library'}}catch(e){}
   return null;
 }
 async function lookupCode(code){
@@ -485,7 +498,8 @@ async function coverToData(url){
 }
 function applyInfo(info){
   const f=F();
-  if(info.type&&f.type.value!==info.type){f.type.value=info.type;applyType()}
+  if(info.type==='dvd'&&f.type.value!=='dvd'){f.type.value='dvd';applyType()}
+  else if(info.type!=='dvd'&&f.type.value==='dvd'){f.type.value='bd';applyType()}
   ['title','creator','publisher','year','genre'].forEach(k=>{if(info[k]&&!f[k].value.trim())f[k].value=info[k]});
   if(info.cover&&!cover)setCover(info.cover);
 }
@@ -579,14 +593,6 @@ function onCode(raw){
     const box=document.createElement('div');box.className='sub';box.style.margin='8px 0';box.textContent='Recherche en ligne…';r.appendChild(box);
     lookupCode(code).then(info=>{
       found=info;
-      if(info&&$('#scRapid').checked){
-        (async()=>{
-          const cv2=await bestCover(info,code);
-          await save({id:uid(),added:Date.now(),type:'livre',title:info.title,series:'',volume:'',creator:info.creator,publisher:info.publisher,year:info.year,format:FORMATS.livre[0],genre:info.genre,code:code,location:'',wish:false,done:false,rating:0,loanedTo:'',loanDate:'',notes:'',cover:cv2});
-          r.innerHTML='<div style="font-weight:600;color:var(--ok)">✅ Ajouté : '+esc(info.title)+'</div><div class="sub">'+esc(info.creator||'')+' — scanne le suivant.</div>';
-        })();
-        return;
-      }
       box.innerHTML=info?('🔎 Trouvé ('+esc(info.src)+') : <b>'+esc(info.title)+'</b>'+(info.creator?' — '+esc(info.creator):'')+(info.year?' ('+esc(info.year)+')':'')+'<br>Vérifie, puis ajoute.'):'Rien trouvé en ligne : tu remplis à la main.<br><small>Détails : '+esc(LOG.join(' · ')||'aucun')+'</small>';
     }).catch(()=>{box.textContent='Recherche impossible : tu remplis à la main.'});
     $('#scAdd').onclick=()=>addFromScan(code,false,found);
